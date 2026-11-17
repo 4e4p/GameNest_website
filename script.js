@@ -62,16 +62,6 @@
     weeklyDropDay: 5,
     weeklyDropHour: 23,
     weeklyDropMinute: 59,
-    discountTiers: [
-      { min: 2, pct: 10, label: "10% OFF" },
-      { min: 3, pct: 15, label: "15% OFF" },
-      { min: 5, pct: 20, label: "20% OFF" }
-    ],
-    promos: {
-      GAMENEST10: { pct: 10, label: "10% OFF" },
-      DROP15:      { pct: 15, label: "15% OFF" },
-      LEVELUP20:   { pct: 20, label: "20% OFF" }
-    }
   };
 
   /* ============================================================
@@ -600,34 +590,9 @@
     const sub = cartSubtotal();
     const subEl = $("#coSubtotal");
     const totEl = $("#coTotal");
-    const count = cartCount();
 
     if (subEl) subEl.textContent = fmtPrice(sub);
-
-    let pct = 0;
-    let label = "";
-    for (const tier of CFG.discountTiers) {
-      if (count >= tier.min) { pct = tier.pct; label = tier.label; }
-    }
-    if (state.promo) { pct = state.promo.pct; label = state.promo.label; }
-
-    const discEl = $("#discountPct");
-    const fillEl = $("#discountFill");
-    const msgEl = $("#discountMsg");
-    if (discEl) discEl.textContent = pct + "%";
-    if (fillEl) fillEl.style.width = Math.min(100, (pct / 20) * 100) + "%";
-    if (msgEl) {
-      if (pct > 0) msgEl.textContent = label + " applied";
-      else {
-        const next = CFG.discountTiers.find(t => count < t.min);
-        msgEl.textContent = next
-          ? `Add ${next.min - count} more item(s) to unlock ${next.pct}% off`
-          : "Add items to unlock discounts";
-      }
-    }
-
-    const total = sub - (sub * pct / 100);
-    if (totEl) totEl.textContent = fmtPrice(total);
+    if (totEl) totEl.textContent = fmtPrice(sub);
 
     const refEl = $("#coReference");
     if (refEl && !refEl.dataset.filled) {
@@ -701,12 +666,8 @@
     try {
       const orderId = genOrderId();
       const sub = cartSubtotal();
-      const count = cartCount();
-      let pct = 0;
-      for (const tier of CFG.discountTiers) if (count >= tier.min) pct = tier.pct;
-      if (state.promo) pct = state.promo.promo ? state.promo.pct : state.promo.pct;
-      if (state.promo) pct = state.promo.pct;
-      const total = sub - (sub * pct / 100);
+      const pct = 0;
+      const total = sub;
 
       const items = state.cart.map(i => {
         const p = getProductById(i.id);
@@ -1032,17 +993,6 @@
           toast("Copied: " + val);
         }
       });
-    });
-
-    $("#promoApplyBtn")?.addEventListener("click", () => {
-      const input = $("#promoInput");
-      const code = (input?.value || "").trim().toUpperCase();
-      if (!code) { toast("Enter a code"); return; }
-      const promo = CFG.promos[code];
-      if (!promo) { toast("Invalid promo code"); return; }
-      state.promo = { code, ...promo };
-      updateCheckoutSummary();
-      toast("✓ " + promo.label + " applied");
     });
 
     $("#coCountry")?.addEventListener("change", e => {
