@@ -112,6 +112,85 @@
   }
 
   /* ============================================================
+     ADMIN PRODUCT SYNC
+     Reads the catalog managed in the GameNest admin panel.
+     ============================================================ */
+  async function startProductSync() {
+    const database = await initFirebase();
+    if (!database) return;
+
+    try {
+      const { collection, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+      onSnapshot(collection(database, "products"), snapshot => {
+        if (snapshot.empty) return;
+
+        const adminProducts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        let changed = false;
+
+        const normalize = value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const digits = value => (String(value || "").match(/\\d+/g) || []).join("");
+        const categoryFor = kind => kind === "vb" ? "vbucks" : kind;
+
+        PRODUCTS.forEach(product => {
+          const match = adminProducts.find(item => {
+            const adminName = item.name || item.title || item.productName || item.product_name || item.label || item.id;
+            const adminCategory = normalize(item.category || item.cat || item.type || item.kind);
+            const productCategory = categoryFor(product.kind);
+            const sameName = [product.title, product.code, product.id].some(name => normalize(name) === normalize(adminName));
+            const sameCategoryAndAmount =
+              (!adminCategory || adminCategory === normalize(productCategory)) &&
+              digits(adminName) !== "" &&
+              digits(adminName) === digits(product.title);
+            return sameName || sameCategoryAndAmount;
+          });
+
+          if (!match) return;
+          const nextPrice = Number(match.price ?? match.amount ?? match.cost);
+          if (!Number.isFinite(nextPrice) || nextPrice <= 0 || nextPrice === Number(product.price)) return;
+          product.price = nextPrice;
+          changed = true;
+        });
+
+        if (changed) {
+          renderAllProducts();
+          renderCartModal();
+          updateCheckoutSummary();
+          if (state.activeProduct) {
+            const detailPrice = document.querySelector("#detailPrice");
+            if (detailPrice) detailPrice.textContent = fmtPrice(state.activeProduct.price);
+          }
+          updateTickerPrices();
+        }
+      }, error => {
+        console.warn("GameNest admin catalog could not be read:", error);
+      });
+    } catch (error) {
+      console.warn("GameNest product sync could not start:", error);
+    }
+  }
+
+  function updateTickerPrices() {
+    const ticker = document.querySelector(".ticker-track");
+    if (!ticker) return;
+    const labels = {
+      "800 VB": "vb-800",
+      "2400 VB": "vb-2400",
+      "4500 VB": "vb-4500",
+      "12500 VB": "vb-12500",
+      "CREW 1M": "crew-1",
+      "CREW 12M": "crew-12",
+      "GIFT 500": "gift-500",
+      "GIFT 2000": "gift-2000"
+    };
+    ticker.querySelectorAll("span").forEach(span => {
+      const label = Object.keys(labels).find(key => span.textContent.trim().startsWith("⚡ " + key));
+      if (!label) return;
+      const product = PRODUCTS.find(item => item.id === labels[label]);
+      if (product) span.textContent = "⚡ " + label + " — " + fmt(product.price) + " EGP";
+    });
+  }
+
+  /* ============================================================
      2. PRODUCTS DATA
      ============================================================ */
   const PRODUCTS = [
@@ -1104,13 +1183,14 @@
      ============================================================ */
   function boot() {
     renderAllProducts();
+    updateTickerPrices();
     renderCartModal();
     renderFavModal();
     bindGlobalEvents();
     startCountdown();
     updateCheckoutSummary();
     updatePaymentUI();
-    initFirebase().catch(() => {});
+    initFirebase().then(startProductSync).catch(() => {});
     runSearch("");
   }
 
