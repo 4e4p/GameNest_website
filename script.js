@@ -128,7 +128,7 @@
         let changed = false;
 
         const normalize = value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        const digits = value => (String(value || "").match(/\\d+/g) || []).join("");
+        const digits = value => (String(value || "").match(/\d+/g) || []).join("");
         const categoryFor = kind => kind === "vb" ? "vbucks" : kind;
 
         PRODUCTS.forEach(product => {
